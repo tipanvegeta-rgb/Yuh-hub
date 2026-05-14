@@ -1,0 +1,982 @@
+-- ================================================
+--             YUH HUB  |  by Yuh
+--       v4.0  |  Rango Infinito + Mining
+-- ================================================
+
+local Players          = game:GetService("Players")
+local ReplicatedStorage= game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local RunService       = game:GetService("RunService")
+local TweenService     = game:GetService("TweenService")
+
+-- ==================== LÃ“GICA ESP ====================
+local ESPEnabled = false
+local ESPObjects = {}
+
+local function CreateESP(target)
+    if not target:FindFirstChild("Head") then return end
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name        = "YeoESP"
+    billboard.Adornee     = target:FindFirstChild("Head")
+    billboard.Size        = UDim2.new(0, 100, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 2, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent      = target:FindFirstChild("Head")
+    local label = Instance.new("TextLabel")
+    label.BackgroundTransparency = 1
+    label.Size   = UDim2.new(1, 0, 1, 0)
+    label.Text   = target.Name
+    label.Font   = "GothamBold"
+    label.TextSize = 14
+    label.TextColor3 = target:IsA("Player") and Color3.new(0,1,1) or Color3.new(1,1,1)
+    label.TextStrokeTransparency = 0
+    label.Parent = billboard
+    table.insert(ESPObjects, billboard)
+end
+
+local function ClearESP()
+    for _, obj in pairs(ESPObjects) do
+        if obj then obj:Destroy() end
+    end
+    ESPObjects = {}
+end
+
+local function UpdateESP()
+    ClearESP()
+    if not ESPEnabled then return end
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= Players.LocalPlayer and p.Character then
+            CreateESP(p.Character)
+        end
+    end
+    local enemies = workspace:FindFirstChild("Enemies")
+    if enemies then
+        for _, npc in pairs(enemies:GetChildren()) do
+            CreateESP(npc)
+        end
+    end
+end
+
+-- ==================== LÃ“GICA FAST ATTACK ====================
+local FastAttackEnabled    = false
+local FastAttackRange      = 5000
+local FastAttackConnection = nil
+local Net            = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Net")
+local RegisterHit    = Net["RE/RegisterHit"]
+local RegisterAttack = Net["RE/RegisterAttack"]
+
+local function AttackMultipleTargets(targets)
+    pcall(function()
+        if not targets or #targets == 0 then return end
+        local allTargets = {}
+        for _, char in pairs(targets) do
+            local head = char:FindFirstChild("Head")
+            if head then table.insert(allTargets, {char, head}) end
+        end
+        if #allTargets == 0 then return end
+        RegisterAttack:FireServer(0)
+        RegisterHit:FireServer(allTargets[1][2], allTargets)
+    end)
+end
+
+local function StartFastAttack()
+    if FastAttackConnection then task.cancel(FastAttackConnection) end
+    FastAttackConnection = task.spawn(function()
+        while FastAttackEnabled do
+            RunService.Stepped:Wait()
+            local myChar = Players.LocalPlayer.Character
+            local myHRP  = myChar and myChar:FindFirstChild("HumanoidRootPart")
+            if not myHRP then continue end
+            local targets = {}
+            for _, player in pairs(Players:GetPlayers()) do
+                if player ~= Players.LocalPlayer and player.Character then
+                    local hum = player.Character:FindFirstChild("Humanoid")
+                    local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+                    if hum and hrp and hum.Health > 0 and (hrp.Position - myHRP.Position).Magnitude <= FastAttackRange then
+                        table.insert(targets, player.Character)
+                    end
+                end
+            end
+            local enemies = workspace:FindFirstChild("Enemies")
+            if enemies then
+                for _, npc in pairs(enemies:GetChildren()) do
+                    local hum = npc:FindFirstChild("Humanoid")
+                    local hrp = npc:FindFirstChild("HumanoidRootPart")
+                    if hum and hrp and hum.Health > 0 and (hrp.Position - myHRP.Position).Magnitude <= FastAttackRange then
+                        table.insert(targets, npc)
+                    end
+                end
+            end
+            if #targets > 0 then AttackMultipleTargets(targets) end
+        end
+    end)
+end
+
+-- ==================== LÃ“GICA RANGO INFINITO ====================
+local HitboxEnabled = false
+local HitboxSize    = Vector3.new(15, 15, 15)
+local originalSizes = {}
+
+local function EnableHitbox()
+    local char = Players.LocalPlayer.Character
+    if not char then return end
+    for _, part in pairs(char:GetDescendants()) do
+        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+            originalSizes[part] = part.Size
+            part.Size = HitboxSize
+        end
+    end
+end
+
+local function DisableHitbox()
+    for part, sz in pairs(originalSizes) do
+        pcall(function() part.Size = sz end)
+    end
+    originalSizes = {}
+end
+
+local AutoAttackAllEnabled    = false
+local AutoAttackAllConnection = nil
+
+local function StartAutoAttackAll()
+    if AutoAttackAllConnection then task.cancel(AutoAttackAllConnection) end
+    AutoAttackAllConnection = task.spawn(function()
+        while AutoAttackAllEnabled do
+            RunService.Stepped:Wait()
+            local myChar = Players.LocalPlayer.Character
+            local myHRP  = myChar and myChar:FindFirstChild("HumanoidRootPart")
+            if not myHRP then continue end
+            local targets = {}
+            for _, player in pairs(Players:GetPlayers()) do
+                if player ~= Players.LocalPlayer and player.Character then
+                    local hum = player.Character:FindFirstChild("Humanoid")
+                    local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+                    if hum and hrp and hum.Health > 0 then
+                        table.insert(targets, player.Character)
+                    end
+                end
+            end
+            local enemies = workspace:FindFirstChild("Enemies")
+            if enemies then
+                for _, npc in pairs(enemies:GetChildren()) do
+                    local hum = npc:FindFirstChild("Humanoid")
+                    local hrp = npc:FindFirstChild("HumanoidRootPart")
+                    if hum and hrp and hum.Health > 0 then
+                        table.insert(targets, npc)
+                    end
+                end
+            end
+            if #targets > 0 then AttackMultipleTargets(targets) end
+        end
+    end)
+end
+
+local KillAuraEnabled    = false
+local KillAuraConnection = nil
+
+local function StartKillAura()
+    if KillAuraConnection then task.cancel(KillAuraConnection) end
+    KillAuraConnection = task.spawn(function()
+        while KillAuraEnabled do
+            task.wait(0.05)
+            pcall(function()
+                for _, player in pairs(Players:GetPlayers()) do
+                    if player ~= Players.LocalPlayer and player.Character then
+                        local hum  = player.Character:FindFirstChild("Humanoid")
+                        local head = player.Character:FindFirstChild("Head")
+                        if hum and head and hum.Health > 0 then
+                            RegisterAttack:FireServer(0)
+                            RegisterHit:FireServer(head, {{player.Character, head}})
+                        end
+                    end
+                end
+                local enemies = workspace:FindFirstChild("Enemies")
+                if enemies then
+                    for _, npc in pairs(enemies:GetChildren()) do
+                        local hum  = npc:FindFirstChild("Humanoid")
+                        local head = npc:FindFirstChild("Head")
+                        if hum and head and hum.Health > 0 then
+                            RegisterAttack:FireServer(0)
+                            RegisterHit:FireServer(head, {{npc, head}})
+                        end
+                    end
+                end
+            end)
+        end
+    end)
+end
+
+-- ==================== LÃ“GICA MINING TYCOON ====================
+local AutoFarmEnabled    = false
+local AutoSellEnabled    = false
+local AutoUpgradeEnabled = false
+local AutoSpeedEnabled   = false
+local MiningLoopConn     = nil
+local SellLoopConn       = nil
+local UpgradeLoopConn    = nil
+local MiningWalkSpeed    = 100
+
+-- Auto Farm / Mine
+local function StartAutoFarm()
+    if MiningLoopConn then task.cancel(MiningLoopConn) end
+    MiningLoopConn = task.spawn(function()
+        while AutoFarmEnabled do
+            pcall(function()
+                local char = Players.LocalPlayer.Character
+                local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+                if not hrp then return end
+                local oreKeywords = {
+                    "ore","rock","crystal","gem","coal","iron",
+                    "gold","diamond","mine","stone","ruby","emerald","amethyst"
+                }
+                for _, part in pairs(workspace:GetDescendants()) do
+                    if not AutoFarmEnabled then break end
+                    if part:IsA("BasePart") or part:IsA("MeshPart") or part:IsA("UnionOperation") then
+                        local n = part.Name:lower()
+                        for _, kw in pairs(oreKeywords) do
+                            if n:find(kw) then
+                                hrp.CFrame = part.CFrame + Vector3.new(0, 4, 0)
+                                task.wait(0.07)
+                                -- Disparar remotes de minerÃ­a
+                                pcall(function()
+                                    for _, rem in pairs(ReplicatedStorage:GetDescendants()) do
+                                        if rem:IsA("RemoteEvent") then
+                                            local rn = rem.Name:lower()
+                                            if rn:find("mine") or rn:find("hit") or rn:find("break") or rn:find("collect") or rn:find("click") then
+                                                rem:FireServer(part)
+                                            end
+                                        end
+                                        if rem:IsA("RemoteFunction") then
+                                            local rn = rem.Name:lower()
+                                            if rn:find("mine") or rn:find("collect") then
+                                                pcall(function() rem:InvokeServer(part) end)
+                                            end
+                                        end
+                                    end
+                                end)
+                                task.wait(0.05)
+                                break
+                            end
+                        end
+                    end
+                end
+            end)
+            task.wait(0.1)
+        end
+    end)
+end
+
+-- Auto Sell
+local function StartAutoSell()
+    if SellLoopConn then task.cancel(SellLoopConn) end
+    SellLoopConn = task.spawn(function()
+        while AutoSellEnabled do
+            pcall(function()
+                local char = Players.LocalPlayer.Character
+                local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+                if not hrp then return end
+                -- Teletransporte a zona de venta
+                local sellKeywords = {"sell","shop","conveyor","dropper","deposit","cashier"}
+                for _, obj in pairs(workspace:GetDescendants()) do
+                    if obj:IsA("BasePart") then
+                        local n = obj.Name:lower()
+                        for _, kw in pairs(sellKeywords) do
+                            if n:find(kw) then
+                                hrp.CFrame = obj.CFrame + Vector3.new(0, 4, 0)
+                                task.wait(0.3)
+                                break
+                            end
+                        end
+                    end
+                end
+                -- Disparar remotes de venta
+                for _, rem in pairs(ReplicatedStorage:GetDescendants()) do
+                    if rem:IsA("RemoteEvent") then
+                        local rn = rem.Name:lower()
+                        if rn:find("sell") or rn:find("cash") or rn:find("money") or rn:find("earn") then
+                            rem:FireServer()
+                            task.wait(0.1)
+                        end
+                    end
+                end
+            end)
+            task.wait(1.5)
+        end
+    end)
+end
+
+-- Auto Upgrade
+local function StartAutoUpgrade()
+    if UpgradeLoopConn then task.cancel(UpgradeLoopConn) end
+    UpgradeLoopConn = task.spawn(function()
+        while AutoUpgradeEnabled do
+            pcall(function()
+                for _, rem in pairs(ReplicatedStorage:GetDescendants()) do
+                    if rem:IsA("RemoteEvent") then
+                        local rn = rem.Name:lower()
+                        if rn:find("upgrade") or rn:find("buy") or rn:find("purchase") or rn:find("level") then
+                            rem:FireServer()
+                            task.wait(0.2)
+                        end
+                    end
+                    if rem:IsA("RemoteFunction") then
+                        local rn = rem.Name:lower()
+                        if rn:find("upgrade") or rn:find("buy") then
+                            pcall(function() rem:InvokeServer() end)
+                            task.wait(0.2)
+                        end
+                    end
+                end
+            end)
+            task.wait(2)
+        end
+    end)
+end
+
+-- ==================== UI ====================
+local pgui = Players.LocalPlayer:WaitForChild("PlayerGui")
+if pgui:FindFirstChild("YuhHub") then pgui.YuhHub:Destroy() end
+
+local screenGui = Instance.new("ScreenGui", pgui)
+screenGui.Name           = "YuhHub"
+screenGui.ResetOnSpawn   = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+-- Colores
+local C = {
+    bg       = Color3.fromRGB(10, 10, 18),
+    panel    = Color3.fromRGB(16, 16, 28),
+    card     = Color3.fromRGB(22, 22, 38),
+    accent   = Color3.fromRGB(120, 80, 255),
+    accent2  = Color3.fromRGB(200, 120, 255),
+    btnBg    = Color3.fromRGB(28, 28, 46),
+    btnHover = Color3.fromRGB(38, 28, 60),
+    text     = Color3.fromRGB(220, 210, 255),
+    textDim  = Color3.fromRGB(120, 110, 160),
+    red      = Color3.fromRGB(220, 60, 80),
+    green    = Color3.fromRGB(80, 220, 140),
+    border   = Color3.fromRGB(60, 40, 100),
+    orange   = Color3.fromRGB(255, 140, 40),
+    gold     = Color3.fromRGB(255, 200, 0),
+    cyan     = Color3.fromRGB(0, 200, 255),
+    yellow   = Color3.fromRGB(255, 230, 80),
+    lime     = Color3.fromRGB(120, 255, 80),
+}
+
+-- Ventana
+local normalSize    = UDim2.new(0, 440, 0, 340)
+local minimizedSize = UDim2.new(0, 160, 0, 38)
+
+local mainFrame = Instance.new("Frame", screenGui)
+mainFrame.Name             = "Main"
+mainFrame.Size             = normalSize
+mainFrame.Position         = UDim2.new(0.5, -220, 0.28, 0)
+mainFrame.BackgroundColor3 = C.bg
+mainFrame.Active           = true
+mainFrame.Draggable        = true
+mainFrame.ClipsDescendants = true
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 14)
+local mainStroke = Instance.new("UIStroke", mainFrame)
+mainStroke.Color        = C.accent
+mainStroke.Thickness    = 1.5
+mainStroke.Transparency = 0.3
+
+-- Barra gradiente top
+local gradientBar = Instance.new("Frame", mainFrame)
+gradientBar.Size             = UDim2.new(1, 0, 0, 3)
+gradientBar.BackgroundColor3 = C.accent
+gradientBar.BorderSizePixel  = 0
+local gradGrad = Instance.new("UIGradient", gradientBar)
+gradGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,   C.accent),
+    ColorSequenceKeypoint.new(0.5, C.accent2),
+    ColorSequenceKeypoint.new(1,   C.accent),
+})
+
+-- Top bar
+local topBar = Instance.new("Frame", mainFrame)
+topBar.Size             = UDim2.new(1, 0, 0, 42)
+topBar.Position         = UDim2.new(0, 0, 0, 3)
+topBar.BackgroundColor3 = C.panel
+topBar.BorderSizePixel  = 0
+
+local topSep = Instance.new("Frame", topBar)
+topSep.Size             = UDim2.new(1, 0, 0, 1)
+topSep.Position         = UDim2.new(0, 0, 1, -1)
+topSep.BackgroundColor3 = C.border
+topSep.BorderSizePixel  = 0
+
+local iconLabel = Instance.new("TextLabel", topBar)
+iconLabel.Size               = UDim2.new(0, 30, 1, 0)
+iconLabel.Position           = UDim2.new(0, 10, 0, 0)
+iconLabel.Text               = "â—ˆ"
+iconLabel.TextColor3         = C.accent2
+iconLabel.Font               = Enum.Font.GothamBold
+iconLabel.TextSize           = 18
+iconLabel.BackgroundTransparency = 1
+
+local titleLabel = Instance.new("TextLabel", topBar)
+titleLabel.Size               = UDim2.new(0.5, 0, 1, 0)
+titleLabel.Position           = UDim2.new(0, 40, 0, 0)
+titleLabel.Text               = "YUH HUB"
+titleLabel.TextColor3         = C.text
+titleLabel.Font               = Enum.Font.GothamBlack
+titleLabel.TextSize           = 15
+titleLabel.TextXAlignment     = Enum.TextXAlignment.Left
+titleLabel.BackgroundTransparency = 1
+
+local verLabel = Instance.new("TextLabel", topBar)
+verLabel.Size             = UDim2.new(0.3, 0, 0, 14)
+verLabel.Position         = UDim2.new(0, 40, 0.58, 0)
+verLabel.Text             = "v4.0  |  premium"
+verLabel.TextColor3       = C.textDim
+verLabel.Font             = Enum.Font.Gotham
+verLabel.TextSize         = 9
+verLabel.TextXAlignment   = Enum.TextXAlignment.Left
+verLabel.BackgroundTransparency = 1
+
+-- Botones control
+local function makeCtrlBtn(icon, bgColor, xPos)
+    local btn = Instance.new("TextButton", topBar)
+    btn.Size             = UDim2.new(0, 22, 0, 22)
+    btn.Position         = UDim2.new(1, xPos, 0.5, -11)
+    btn.Text             = icon
+    btn.TextColor3       = Color3.new(1,1,1)
+    btn.BackgroundColor3 = bgColor
+    btn.Font             = Enum.Font.GothamBold
+    btn.TextSize         = 11
+    btn.AutoButtonColor  = false
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundTransparency = 0.3}):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundTransparency = 0}):Play()
+    end)
+    return btn
+end
+
+local closeBtn    = makeCtrlBtn("âœ•", C.red,                      -30)
+local maximizeBtn = makeCtrlBtn("â–¡", Color3.fromRGB(50, 50, 80), -58)
+local minimizeBtn = makeCtrlBtn("âˆ’", Color3.fromRGB(50, 50, 80), -86)
+
+-- Tab row
+local tabRow = Instance.new("Frame", mainFrame)
+tabRow.Size             = UDim2.new(1, -16, 0, 32)
+tabRow.Position         = UDim2.new(0, 8, 0, 50)
+tabRow.BackgroundTransparency = 1
+local tabLayout = Instance.new("UIListLayout", tabRow)
+tabLayout.FillDirection       = Enum.FillDirection.Horizontal
+tabLayout.Padding             = UDim.new(0, 3)
+tabLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+tabLayout.VerticalAlignment   = Enum.VerticalAlignment.Center
+
+-- Content frame
+local contentFrame = Instance.new("Frame", mainFrame)
+contentFrame.Size             = UDim2.new(1, -16, 1, -92)
+contentFrame.Position         = UDim2.new(0, 8, 0, 87)
+contentFrame.BackgroundTransparency = 1
+
+local function createPage(name)
+    local p = Instance.new("ScrollingFrame", contentFrame)
+    p.Name                 = name
+    p.Size                 = UDim2.new(1, 0, 1, 0)
+    p.BackgroundTransparency = 1
+    p.Visible              = false
+    p.ScrollBarThickness   = 2
+    p.ScrollBarImageColor3 = C.accent
+    p.CanvasSize           = UDim2.new(0, 0, 0, 500)
+    local lay = Instance.new("UIListLayout", p)
+    lay.Padding             = UDim.new(0, 7)
+    lay.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    return p
+end
+
+local combatPage = createPage("Combate")
+local movePage   = createPage("Movimiento")
+local sea2Page   = createPage("Sea2")
+local sea3Page   = createPage("Sea3")
+local rangoPage  = createPage("RangoInf")
+local miningPage = createPage("Mining")     -- â† NUEVA PESTAÃ‘A
+
+local activePage   = nil
+local activeTabBtn = nil
+
+local function showPage(page)
+    for _, v in pairs(contentFrame:GetChildren()) do
+        if v:IsA("ScrollingFrame") then v.Visible = false end
+    end
+    page.Visible = true
+    activePage   = page
+end
+
+local function createTab(label, icon, page)
+    local btn = Instance.new("TextButton", tabRow)
+    btn.Size             = UDim2.new(0, 68, 1, 0)
+    btn.Text             = icon .. " " .. label
+    btn.BackgroundColor3 = C.card
+    btn.TextColor3       = C.textDim
+    btn.Font             = Enum.Font.GothamBold
+    btn.TextSize         = 8
+    btn.AutoButtonColor  = false
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+    local stroke = Instance.new("UIStroke", btn)
+    stroke.Color     = C.border
+    stroke.Thickness = 1
+
+    local function setActive(active)
+        if active then
+            TweenService:Create(btn, TweenInfo.new(0.18), {BackgroundColor3 = C.btnHover, TextColor3 = C.accent2}):Play()
+            stroke.Color     = C.accent
+            stroke.Thickness = 1.2
+        else
+            TweenService:Create(btn, TweenInfo.new(0.18), {BackgroundColor3 = C.card, TextColor3 = C.textDim}):Play()
+            stroke.Color     = C.border
+            stroke.Thickness = 1
+        end
+    end
+
+    btn.MouseButton1Click:Connect(function()
+        if activeTabBtn then activeTabBtn[2](false) end
+        activeTabBtn = {btn, setActive}
+        setActive(true)
+        showPage(page)
+    end)
+    btn.MouseEnter:Connect(function()
+        if activePage ~= page then TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = C.btnBg}):Play() end
+    end)
+    btn.MouseLeave:Connect(function()
+        if activePage ~= page then TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = C.card}):Play() end
+    end)
+    return {btn, setActive}
+end
+
+local tabCombat = createTab("Combat", "âš”",  combatPage)
+local tabMove   = createTab("Movim.", "ðŸƒ",  movePage)
+local tabSea2   = createTab("Sea 2",  "ðŸŒŠ",  sea2Page)
+local tabSea3   = createTab("Sea 3",  "ðŸ°",  sea3Page)
+local tabRango  = createTab("âˆžRango", "ðŸŽ¯",  rangoPage)
+local tabMining = createTab("Mining", "â›",  miningPage)
+
+activeTabBtn = tabCombat
+tabCombat[2](true)
+showPage(combatPage)
+
+-- â”€â”€ HELPERS UI â”€â”€
+local function addBtn(txt, accentColor, parent)
+    local btn = Instance.new("TextButton", parent)
+    btn.Size             = UDim2.new(0.96, 0, 0, 38)
+    btn.BackgroundColor3 = C.btnBg
+    btn.Text             = txt
+    btn.TextColor3       = C.text
+    btn.Font             = Enum.Font.GothamBold
+    btn.TextSize         = 11
+    btn.AutoButtonColor  = false
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 9)
+    local stroke = Instance.new("UIStroke", btn)
+    stroke.Color        = accentColor or C.border
+    stroke.Thickness    = 1
+    stroke.Transparency = 0.4
+    local dot = Instance.new("Frame", btn)
+    dot.Size             = UDim2.new(0, 3, 0.5, 0)
+    dot.Position         = UDim2.new(0, 0, 0.25, 0)
+    dot.BackgroundColor3 = accentColor or C.accent
+    dot.BorderSizePixel  = 0
+    Instance.new("UICorner", dot).CornerRadius = UDim.new(0, 4)
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.14), {BackgroundColor3 = C.btnHover}):Play()
+        stroke.Transparency = 0
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.14), {BackgroundColor3 = C.btnBg}):Play()
+        stroke.Transparency = 0.4
+    end)
+    return btn
+end
+
+local function setToggleStyle(btn, dot, stroke, enabled, labelOn, labelOff, colorOn, colorOff)
+    btn.Text             = enabled and labelOn or labelOff
+    local col            = enabled and colorOn or colorOff
+    dot.BackgroundColor3 = col
+    stroke.Color         = col
+    TweenService:Create(btn, TweenInfo.new(0.15), {TextColor3 = enabled and col or C.text}):Play()
+end
+
+local function getDot(btn)    return btn:FindFirstChildWhichIsA("Frame") end
+local function getStroke(btn) return btn:FindFirstChildWhichIsA("UIStroke") end
+
+local function addHeader(txt, color, parent)
+    local lbl = Instance.new("TextLabel", parent)
+    lbl.Size             = UDim2.new(0.96, 0, 0, 22)
+    lbl.BackgroundColor3 = Color3.fromRGB(20, 12, 40)
+    lbl.Text             = "  " .. txt
+    lbl.TextColor3       = color or C.accent2
+    lbl.Font             = Enum.Font.GothamBlack
+    lbl.TextSize         = 11
+    lbl.TextXAlignment   = Enum.TextXAlignment.Left
+    lbl.BorderSizePixel  = 0
+    Instance.new("UICorner", lbl).CornerRadius = UDim.new(0, 8)
+    local s = Instance.new("UIStroke", lbl)
+    s.Color = color or C.accent
+    return lbl
+end
+
+-- ==================== BOTONES COMBATE ====================
+
+local fBtn = addBtn("âš¡  Fast Attack  [ OFF ]", C.gold, combatPage)
+fBtn.MouseButton1Click:Connect(function()
+    FastAttackEnabled = not FastAttackEnabled
+    setToggleStyle(fBtn, getDot(fBtn), getStroke(fBtn), FastAttackEnabled,
+        "âš¡  Fast Attack  [ ON ]", "âš¡  Fast Attack  [ OFF ]", C.green, C.gold)
+    if FastAttackEnabled then StartFastAttack()
+    else if FastAttackConnection then task.cancel(FastAttackConnection) end end
+end)
+
+local hBtn = addBtn("ðŸ’¥  Hitbox Extendida  [ OFF ]", C.red, combatPage)
+hBtn.MouseButton1Click:Connect(function()
+    HitboxEnabled = not HitboxEnabled
+    setToggleStyle(hBtn, getDot(hBtn), getStroke(hBtn), HitboxEnabled,
+        "ðŸ’¥  Hitbox Extendida  [ ON ]", "ðŸ’¥  Hitbox Extendida  [ OFF ]", C.green, C.red)
+    if HitboxEnabled then EnableHitbox() else DisableHitbox() end
+end)
+
+local espBtn = addBtn("ðŸ‘  ESP  [ OFF ]", C.orange, combatPage)
+espBtn.MouseButton1Click:Connect(function()
+    ESPEnabled = not ESPEnabled
+    setToggleStyle(espBtn, getDot(espBtn), getStroke(espBtn), ESPEnabled,
+        "ðŸ‘  ESP  [ ON ]", "ðŸ‘  ESP  [ OFF ]", C.green, C.orange)
+    UpdateESP()
+end)
+
+task.spawn(function()
+    while true do task.wait(5) if ESPEnabled then UpdateESP() end end
+end)
+
+-- ==================== BOTONES MOVIMIENTO ====================
+
+local sBtn = addBtn("ðŸƒ  Speed Controller  [ OFF ]", Color3.fromRGB(0,200,180), movePage)
+
+local speedPanel = Instance.new("Frame", screenGui)
+speedPanel.Size             = UDim2.new(0, 145, 0, 50)
+speedPanel.Position         = UDim2.new(0, 18, 0.44, 0)
+speedPanel.BackgroundColor3 = C.panel
+speedPanel.Visible          = false
+speedPanel.Active           = true
+speedPanel.Draggable        = true
+Instance.new("UICorner", speedPanel).CornerRadius = UDim.new(0, 10)
+local spStroke = Instance.new("UIStroke", speedPanel)
+spStroke.Color     = C.accent
+spStroke.Thickness = 1.2
+
+local spTitle = Instance.new("TextLabel", speedPanel)
+spTitle.Size = UDim2.new(1,0,0,16); spTitle.Position = UDim2.new(0,0,0,2)
+spTitle.Text = "WALKSPEED"; spTitle.TextColor3 = C.textDim
+spTitle.Font = Enum.Font.GothamBold; spTitle.TextSize = 8; spTitle.BackgroundTransparency = 1
+
+local btnM = Instance.new("TextButton", speedPanel)
+btnM.Size = UDim2.new(0,28,0,28); btnM.Position = UDim2.new(0,8,0.5,-2)
+btnM.Text = "âˆ’"; btnM.BackgroundColor3 = C.card; btnM.TextColor3 = C.text
+btnM.Font = Enum.Font.GothamBold; btnM.TextSize = 14; btnM.AutoButtonColor = false
+Instance.new("UICorner", btnM).CornerRadius = UDim.new(0,7)
+
+local sDisp = Instance.new("TextLabel", speedPanel)
+sDisp.Size = UDim2.new(0,55,0,28); sDisp.Position = UDim2.new(0,42,0.5,-2)
+sDisp.Text = "16"; sDisp.TextColor3 = C.accent2
+sDisp.Font = Enum.Font.GothamBlack; sDisp.TextSize = 16; sDisp.BackgroundTransparency = 1
+
+local btnP = Instance.new("TextButton", speedPanel)
+btnP.Size = UDim2.new(0,28,0,28); btnP.Position = UDim2.new(1,-36,0.5,-2)
+btnP.Text = "+"; btnP.BackgroundColor3 = C.card; btnP.TextColor3 = C.text
+btnP.Font = Enum.Font.GothamBold; btnP.TextSize = 14; btnP.AutoButtonColor = false
+Instance.new("UICorner", btnP).CornerRadius = UDim.new(0,7)
+
+local sVal, sAct = 16, false
+sBtn.MouseButton1Click:Connect(function()
+    sAct = not sAct
+    speedPanel.Visible = sAct
+    setToggleStyle(sBtn, getDot(sBtn), getStroke(sBtn), sAct,
+        "ðŸƒ  Speed Controller  [ ON ]", "ðŸƒ  Speed Controller  [ OFF ]",
+        C.green, Color3.fromRGB(0,200,180))
+end)
+btnP.MouseButton1Click:Connect(function() sVal = math.clamp(sVal+10, 16, 500); sDisp.Text = tostring(sVal) end)
+btnM.MouseButton1Click:Connect(function() sVal = math.clamp(sVal-10, 16, 500); sDisp.Text = tostring(sVal) end)
+RunService.Heartbeat:Connect(function()
+    if sAct and Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChild("Humanoid") then
+        local hum = Players.LocalPlayer.Character.Humanoid
+        if hum.MoveDirection.Magnitude > 0 then
+            Players.LocalPlayer.Character:TranslateBy(hum.MoveDirection * (sVal/55))
+        end
+    end
+end)
+
+local jBtn = addBtn("ðŸŒ€  Infinite Jump  [ OFF ]", Color3.fromRGB(80,160,255), movePage)
+local iJ   = false
+jBtn.MouseButton1Click:Connect(function()
+    iJ = not iJ
+    setToggleStyle(jBtn, getDot(jBtn), getStroke(jBtn), iJ,
+        "ðŸŒ€  Infinite Jump  [ ON ]", "ðŸŒ€  Infinite Jump  [ OFF ]",
+        C.green, Color3.fromRGB(80,160,255))
+end)
+UserInputService.JumpRequest:Connect(function()
+    if iJ and Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChild("Humanoid") then
+        Players.LocalPlayer.Character.Humanoid:ChangeState("Jumping")
+    end
+end)
+
+local nBtn = addBtn("ðŸ‘»  No Clip  [ OFF ]", Color3.fromRGB(200,200,200), movePage)
+local ncl  = false
+nBtn.MouseButton1Click:Connect(function()
+    ncl = not ncl
+    setToggleStyle(nBtn, getDot(nBtn), getStroke(nBtn), ncl,
+        "ðŸ‘»  No Clip  [ ON ]", "ðŸ‘»  No Clip  [ OFF ]",
+        C.green, Color3.fromRGB(200,200,200))
+end)
+RunService.Stepped:Connect(function()
+    if ncl then
+        for _, v in pairs(Players.LocalPlayer.Character:GetDescendants()) do
+            if v:IsA("BasePart") then v.CanCollide = false end
+        end
+    end
+end)
+
+local walkWaterEnabled = false
+local wowBtn = addBtn("ðŸŒŠ  Walk on Water  [ OFF ]", C.cyan, movePage)
+wowBtn.MouseButton1Click:Connect(function()
+    walkWaterEnabled = not walkWaterEnabled
+    setToggleStyle(wowBtn, getDot(wowBtn), getStroke(wowBtn), walkWaterEnabled,
+        "ðŸŒŠ  Walk on Water  [ ON ]", "ðŸŒŠ  Walk on Water  [ OFF ]",
+        C.green, C.cyan)
+end)
+RunService.RenderStepped:Connect(function()
+    local char = Players.LocalPlayer.Character
+    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+    if walkWaterEnabled and hrp then
+        if hrp.Position.Y >= 9.5 and hrp.Velocity.Y <= 0 then
+            local wp = workspace:FindFirstChild("YeoWaterSolid")
+            if not wp then
+                wp = Instance.new("Part", workspace)
+                wp.Name = "YeoWaterSolid"; wp.Size = Vector3.new(20,1,20)
+                wp.Transparency = 1; wp.Anchored = true
+                wp.CanCollide = true; wp.CanQuery = false
+            end
+            wp.CFrame = CFrame.new(hrp.Position.X, 9.2, hrp.Position.Z)
+        else
+            if workspace:FindFirstChild("YeoWaterSolid") then workspace.YeoWaterSolid:Destroy() end
+        end
+    else
+        if workspace:FindFirstChild("YeoWaterSolid") then workspace.YeoWaterSolid:Destroy() end
+    end
+end)
+
+-- ==================== BOTONES SEA 2 ====================
+addBtn("âš“  Barco Maldito (Sea 2)", Color3.fromRGB(0,200,140), sea2Page).MouseButton1Click:Connect(function()
+    Players.LocalPlayer.Character:PivotTo(CFrame.new(923, 126, 32852))
+end)
+
+-- ==================== BOTONES SEA 3 ====================
+addBtn("ðŸ°  Castillo (Sea 3)", Color3.fromRGB(140,60,255), sea3Page).MouseButton1Click:Connect(function()
+    Players.LocalPlayer.Character:PivotTo(CFrame.new(-5085, 316, -3156))
+end)
+addBtn("ðŸš  MansiÃ³n (Sea 3)", Color3.fromRGB(255,160,40), sea3Page).MouseButton1Click:Connect(function()
+    Players.LocalPlayer.Character:PivotTo(CFrame.new(-12463, 375, -7523))
+end)
+
+-- ==================== BOTONES RANGO INFINITO ====================
+addHeader("ðŸŽ¯  RANGO INFINITO", C.accent2, rangoPage)
+
+local aaBtn = addBtn("ðŸŒ  Auto Attack All  [ OFF ]", Color3.fromRGB(255,60,120), rangoPage)
+aaBtn.MouseButton1Click:Connect(function()
+    AutoAttackAllEnabled = not AutoAttackAllEnabled
+    setToggleStyle(aaBtn, getDot(aaBtn), getStroke(aaBtn), AutoAttackAllEnabled,
+        "ðŸŒ  Auto Attack All  [ ON ]", "ðŸŒ  Auto Attack All  [ OFF ]",
+        C.green, Color3.fromRGB(255,60,120))
+    if AutoAttackAllEnabled then StartAutoAttackAll()
+    else if AutoAttackAllConnection then task.cancel(AutoAttackAllConnection) end end
+end)
+
+local kaBtn = addBtn("ðŸ’€  Kill Aura  [ OFF ]", Color3.fromRGB(200,0,0), rangoPage)
+kaBtn.MouseButton1Click:Connect(function()
+    KillAuraEnabled = not KillAuraEnabled
+    setToggleStyle(kaBtn, getDot(kaBtn), getStroke(kaBtn), KillAuraEnabled,
+        "ðŸ’€  Kill Aura  [ ON ]", "ðŸ’€  Kill Aura  [ OFF ]",
+        C.green, Color3.fromRGB(200,0,0))
+    if KillAuraEnabled then StartKillAura()
+    else if KillAuraConnection then task.cancel(KillAuraConnection) end end
+end)
+
+local hxBtn = addBtn("ðŸ“¦  Hitbox Max  [ OFF ]", Color3.fromRGB(255,100,0), rangoPage)
+hxBtn.MouseButton1Click:Connect(function()
+    HitboxEnabled = not HitboxEnabled
+    setToggleStyle(hxBtn, getDot(hxBtn), getStroke(hxBtn), HitboxEnabled,
+        "ðŸ“¦  Hitbox Max  [ ON ]", "ðŸ“¦  Hitbox Max  [ OFF ]",
+        C.green, Color3.fromRGB(255,100,0))
+    if HitboxEnabled then EnableHitbox() else DisableHitbox() end
+end)
+
+local faInfEnabled    = false
+local faInfConnection = nil
+local faInfBtn = addBtn("âš¡  Fast Attack INFINITO  [ OFF ]", C.gold, rangoPage)
+faInfBtn.MouseButton1Click:Connect(function()
+    faInfEnabled = not faInfEnabled
+    setToggleStyle(faInfBtn, getDot(faInfBtn), getStroke(faInfBtn), faInfEnabled,
+        "âš¡  Fast Attack INFINITO  [ ON ]", "âš¡  Fast Attack INFINITO  [ OFF ]",
+        C.green, C.gold)
+    if faInfEnabled then
+        if faInfConnection then task.cancel(faInfConnection) end
+        faInfConnection = task.spawn(function()
+            while faInfEnabled do
+                RunService.Stepped:Wait()
+                local myChar = Players.LocalPlayer.Character
+                local myHRP  = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                if not myHRP then continue end
+                local targets = {}
+                for _, player in pairs(Players:GetPlayers()) do
+                    if player ~= Players.LocalPlayer and player.Character then
+                        local hum = player.Character:FindFirstChild("Humanoid")
+                        local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+                        if hum and hrp and hum.Health > 0 then table.insert(targets, player.Character) end
+                    end
+                end
+                local enemies = workspace:FindFirstChild("Enemies")
+                if enemies then
+                    for _, npc in pairs(enemies:GetChildren()) do
+                        local hum = npc:FindFirstChild("Humanoid")
+                        local hrp = npc:FindFirstChild("HumanoidRootPart")
+                        if hum and hrp and hum.Health > 0 then table.insert(targets, npc) end
+                    end
+                end
+                if #targets > 0 then AttackMultipleTargets(targets) end
+            end
+        end)
+    else
+        if faInfConnection then task.cancel(faInfConnection) end
+    end
+end)
+
+local espGlobalEnabled = false
+local espGlobalBtn = addBtn("ðŸ‘  ESP Global  [ OFF ]", C.orange, rangoPage)
+espGlobalBtn.MouseButton1Click:Connect(function()
+    espGlobalEnabled = not espGlobalEnabled
+    ESPEnabled = espGlobalEnabled
+    setToggleStyle(espGlobalBtn, getDot(espGlobalBtn), getStroke(espGlobalBtn), espGlobalEnabled,
+        "ðŸ‘  ESP Global  [ ON ]", "ðŸ‘  ESP Global  [ OFF ]",
+        C.green, C.orange)
+    UpdateESP()
+end)
+
+-- ==================== BOTONES MINING TYCOON ====================
+addHeader("â›  ULTIMATE MINING TYCOON", C.yellow, miningPage)
+
+-- Auto Farm
+local afBtn = addBtn("â›  Auto Farm / Mine  [ OFF ]", C.lime, miningPage)
+afBtn.MouseButton1Click:Connect(function()
+    AutoFarmEnabled = not AutoFarmEnabled
+    setToggleStyle(afBtn, getDot(afBtn), getStroke(afBtn), AutoFarmEnabled,
+        "â›  Auto Farm / Mine  [ ON ]", "â›  Auto Farm / Mine  [ OFF ]",
+        C.green, C.lime)
+    if AutoFarmEnabled then StartAutoFarm()
+    else if MiningLoopConn then task.cancel(MiningLoopConn) end end
+end)
+
+-- Auto Sell
+local asBtn = addBtn("ðŸ’°  Auto Sell  [ OFF ]", C.gold, miningPage)
+asBtn.MouseButton1Click:Connect(function()
+    AutoSellEnabled = not AutoSellEnabled
+    setToggleStyle(asBtn, getDot(asBtn), getStroke(asBtn), AutoSellEnabled,
+        "ðŸ’°  Auto Sell  [ ON ]", "ðŸ’°  Auto Sell  [ OFF ]",
+        C.green, C.gold)
+    if AutoSellEnabled then StartAutoSell()
+    else if SellLoopConn then task.cancel(SellLoopConn) end end
+end)
+
+-- Auto Upgrade
+local auBtn = addBtn("â¬†  Auto Upgrade  [ OFF ]", C.cyan, miningPage)
+auBtn.MouseButton1Click:Connect(function()
+    AutoUpgradeEnabled = not AutoUpgradeEnabled
+    setToggleStyle(auBtn, getDot(auBtn), getStroke(auBtn), AutoUpgradeEnabled,
+        "â¬†  Auto Upgrade  [ ON ]", "â¬†  Auto Upgrade  [ OFF ]",
+        C.green, C.cyan)
+    if AutoUpgradeEnabled then StartAutoUpgrade()
+    else if UpgradeLoopConn then task.cancel(UpgradeLoopConn) end end
+end)
+
+-- Speed Hack (mining)
+local mSpeedBtn = addBtn("ðŸ’¨  Speed Hack Mining  [ OFF ]", C.orange, miningPage)
+local mSpeedOn  = false
+mSpeedBtn.MouseButton1Click:Connect(function()
+    mSpeedOn = not mSpeedOn
+    setToggleStyle(mSpeedBtn, getDot(mSpeedBtn), getStroke(mSpeedBtn), mSpeedOn,
+        "ðŸ’¨  Speed Hack Mining  [ ON ]", "ðŸ’¨  Speed Hack Mining  [ OFF ]",
+        C.green, C.orange)
+    local char = Players.LocalPlayer.Character
+    if char then
+        local hum = char:FindFirstChild("Humanoid")
+        if hum then hum.WalkSpeed = mSpeedOn and MiningWalkSpeed or 16 end
+    end
+    -- Mantener al respawn
+    if mSpeedOn then
+        Players.LocalPlayer.CharacterAdded:Connect(function(c)
+            if not mSpeedOn then return end
+            local h = c:WaitForChild("Humanoid")
+            h.WalkSpeed = MiningWalkSpeed
+        end)
+    end
+end)
+
+-- Auto Farm + Auto Sell (combo todo en uno)
+local comboBtn = addBtn("ðŸš€  COMBO: Farm + Sell  [ OFF ]", Color3.fromRGB(180,80,255), miningPage)
+local comboOn  = false
+comboBtn.MouseButton1Click:Connect(function()
+    comboOn = not comboOn
+    setToggleStyle(comboBtn, getDot(comboBtn), getStroke(comboBtn), comboOn,
+        "ðŸš€  COMBO: Farm + Sell  [ ON ]", "ðŸš€  COMBO: Farm + Sell  [ OFF ]",
+        C.green, Color3.fromRGB(180,80,255))
+    AutoFarmEnabled = comboOn
+    AutoSellEnabled = comboOn
+    if comboOn then
+        StartAutoFarm()
+        StartAutoSell()
+    else
+        if MiningLoopConn then task.cancel(MiningLoopConn) end
+        if SellLoopConn   then task.cancel(SellLoopConn) end
+    end
+end)
+
+-- ==================== CONTROLES VENTANA ====================
+closeBtn.MouseButton1Click:Connect(function()
+    ESPEnabled           = false
+    HitboxEnabled        = false
+    KillAuraEnabled      = false
+    AutoAttackAllEnabled = false
+    faInfEnabled         = false
+    AutoFarmEnabled      = false
+    AutoSellEnabled      = false
+    AutoUpgradeEnabled   = false
+    comboOn              = false
+    ClearESP()
+    DisableHitbox()
+    if KillAuraConnection      then task.cancel(KillAuraConnection)      end
+    if AutoAttackAllConnection then task.cancel(AutoAttackAllConnection) end
+    if faInfConnection         then task.cancel(faInfConnection)         end
+    if MiningLoopConn          then task.cancel(MiningLoopConn)          end
+    if SellLoopConn            then task.cancel(SellLoopConn)            end
+    if UpgradeLoopConn         then task.cancel(UpgradeLoopConn)         end
+    if workspace:FindFirstChild("YeoWaterSolid") then workspace.YeoWaterSolid:Destroy() end
+    screenGui:Destroy()
+end)
+
+minimizeBtn.MouseButton1Click:Connect(function()
+    contentFrame.Visible = false
+    tabRow.Visible       = false
+    speedPanel.Visible   = false
+    mainFrame:TweenSize(minimizedSize, Enum.EasingDirection.Out, Enum.EasingStyle.Quint, 0.3, true)
+end)
+
+maximizeBtn.MouseButton1Click:Connect(function()
+    mainFrame:TweenSize(normalSize, Enum.EasingDirection.Out, Enum.EasingStyle.Quint, 0.3, true)
+    task.wait(0.2)
+    contentFrame.Visible = true
+    tabRow.Visible       = true
+end)
+
+print("â—ˆ Yuh Hub v4.0 cargado â€” Mining Tycoon + Rango Infinito activos")
